@@ -36,9 +36,9 @@ import java.util.Properties;
 public class ElasticSearchConsumer {
         private static ObjectMapper mapper = new ObjectMapper();
         public static RestHighLevelClient createClient(){
-                String hostname = "poc-es-8156189590.ap-southeast-2.bonsaisearch.net";
-                String username = "d4ueqmeysh";
-                String password = "ds7v5cjhjq";
+                String hostname = "";
+                String username = "";
+                String password = "";
 
                 final CredentialsProvider credentialsProvider = new BasicCredentialsProvider();
                 credentialsProvider.setCredentials(AuthScope.ANY,
@@ -65,6 +65,7 @@ public class ElasticSearchConsumer {
                 properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
                 properties.put(ConsumerConfig.GROUP_ID_CONFIG, "twitter-gp");
                 properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+                properties.
 
                 // Create the consumer
                 KafkaConsumer<String,String> consumer = new KafkaConsumer<String, String>(properties);
