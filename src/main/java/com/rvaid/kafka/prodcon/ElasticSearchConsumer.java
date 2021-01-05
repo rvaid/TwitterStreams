@@ -65,7 +65,8 @@ public class ElasticSearchConsumer {
                 properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
                 properties.put(ConsumerConfig.GROUP_ID_CONFIG, "twitter-gp");
                 properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-                properties.
+                properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
+                properties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "10");
 
                 // Create the consumer
                 KafkaConsumer<String,String> consumer = new KafkaConsumer<String, String>(properties);
@@ -95,6 +96,7 @@ public class ElasticSearchConsumer {
                 while (true){
                         ConsumerRecords<String, String> consumerRecords =
                                 consumer.poll(Duration.ofMillis(100));
+                        logger.info("Received " + consumerRecords.count() + " records");
                         for (ConsumerRecord record : consumerRecords){
                                 // To make the consumer idempotent
 //                                // Kafka generic id
@@ -109,11 +111,20 @@ public class ElasticSearchConsumer {
                                 logger.info(indexResponse.getId());
 
                                 try {
-                                        Thread.sleep(1000);
+                                        Thread.sleep(10);
                                 } catch (InterruptedException e) {
                                         e.printStackTrace();
                                 }
                         }
+                        logger.info("Committing offsets...");
+                        consumer.commitSync();
+                        logger.info("Offsets committed");
+                        try {
+                                Thread.sleep(1000);
+                        } catch (InterruptedException e) {
+                                e.printStackTrace();
+                        }
+
                 }
 
 //                client.close();
