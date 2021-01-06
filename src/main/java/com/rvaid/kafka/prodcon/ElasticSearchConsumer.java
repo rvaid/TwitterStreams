@@ -17,6 +17,8 @@ import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.elasticsearch.action.bulk.BulkRequest;
+import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.client.RequestOptions;
@@ -59,14 +61,13 @@ public class ElasticSearchConsumer {
 
         public static KafkaConsumer<String,String> createConsumer(String topic){
                 Properties properties = new Properties();
-
                 properties.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
                 properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
                 properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
                 properties.put(ConsumerConfig.GROUP_ID_CONFIG, "twitter-gp");
                 properties.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
                 properties.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, "false");
-                properties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "10");
+                properties.put(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, "100");
 
                 // Create the consumer
                 KafkaConsumer<String,String> consumer = new KafkaConsumer<String, String>(properties);
@@ -97,18 +98,24 @@ public class ElasticSearchConsumer {
                         ConsumerRecords<String, String> consumerRecords =
                                 consumer.poll(Duration.ofMillis(100));
                         logger.info("Received " + consumerRecords.count() + " records");
+                        BulkRequest bulkRequest = new BulkRequest();
                         for (ConsumerRecord record : consumerRecords){
                                 // To make the consumer idempotent
 //                                // Kafka generic id
 //                                String id = record.topic() + "-" + record.partition() + "-" + record.offset();
+                                try{
+                                        // id from twitter feed
+                                        String id = extractIdFromTweet(record.value().toString());
+                                        IndexRequest indexRequest = new IndexRequest("twitter").id(id)
+                                                .source(record.value().toString(), XContentType.JSON);
+                                        // batch here
+                                        bulkRequest.add(indexRequest);
+                                }catch (NullPointerException e){
+                                        logger.warn("Skipping bad data");
+                                }
 
-                                // id from twitter feed
-                                String id = extractIdFromTweet(record.value().toString());
-                                IndexRequest indexRequest = new IndexRequest("twitter").id(id)
-                                        .source(record.value().toString(), XContentType.JSON);
-
-                                IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
-                                logger.info(indexResponse.getId());
+//                                IndexResponse indexResponse = client.index(indexRequest, RequestOptions.DEFAULT);
+//                                logger.info(indexResponse.getId());
 
                                 try {
                                         Thread.sleep(10);
@@ -116,6 +123,9 @@ public class ElasticSearchConsumer {
                                         e.printStackTrace();
                                 }
                         }
+
+                        // Get bulk response and then commit the offsets
+                        BulkResponse bulkResponse = client.bulk(bulkRequest, RequestOptions.DEFAULT);
                         logger.info("Committing offsets...");
                         consumer.commitSync();
                         logger.info("Offsets committed");
